@@ -1,0 +1,334 @@
+cl-fuseki - semantic web database connection
+
+#+tags: code lisp mapreduce thread
+#+BABEL: :tangle no :cache no :session yes :results silent :no-expand yes :noweb yes :exports code
+#+startup: hideblocks overview
+
+This file describes the a lisp-api for fuseki.
+
+#+begin_src lisp :tangle cl-fuseki.lisp :exports none
+  (in-package :cl-fuseki)
+  
+  <<support-functions>>
+  
+  <<simplifications>>
+  
+  <<send-receive-request>>
+  
+  <<base-classes>>
+  
+  <<endpoint-construction>>
+  
+  <<query>>
+#+end_src
+
+* Package description
+cl-fuseki uses asdf for loading the library.  it depends on jsown, drakma and cl-ppcre, all available through quicklisp.
+
+#+begin_src lisp :tangle cl-fuseki.asd
+  (asdf:defsystem :cl-fuseki
+    :name "cl-fuseki"
+    :author "Aad Versteden <madnificent@gmail.com>"
+    :version "0.0.1"
+    :maintainer "Aad Versteden <madnificent@gmail.com>"
+    :licence "MIT"
+    :description "Library with basic support for Fuski through its web interface."
+    :serial t
+    :depends-on (drakma cl-ppcre jsown)
+    :components ((:file "packages")
+                 (:file "cl-fuseki")))
+#+end_src
+
+the package is exported to a separate file.  you should be able to #'use-package this in a lisp-environment containing only :cl
+
+#+begin_src lisp :tangle packages.lisp
+  (defpackage :cl-fuseki
+    (:nicknames :fuseki)
+    (:use :cl :drakma :cl-ppcre :jsown)
+    (:export :fuseki-server :fuseki-repository
+             :name
+             :query :long-query
+             :add-prefix :rm-prefix))
+  
+  (defpackage :cl-fuseki-user
+    (:nicknames :fuseki-user)
+    (:use :cl :cl-fuseki :jsown))
+#+end_src
+
+* Base classes
+we denote the difference between a server and a repository, even though both may be very similar in construction.  besides that we introduce the difference between a server and a fuseki-server, and between a repository and a fuseki-repository.  this may help in extending the library for related systems in the future.
+
+#+source: base-classes
+#+begin_src lisp
+  (defclass server ()
+    ((base-url :accessor base-url
+               :initarg :base-url
+               :initform (error "base url must be supplied")))
+    (:documentation "basic semantic web database server"))
+  
+  (defclass fuseki-server (server)
+    ()
+    (:documentation "fuseki semantic web database server"))
+  
+  (defclass repository ()
+    ((name :accessor name
+           :initarg :name
+           :initform "")
+     (server :accessor server
+             :initarg :server
+             :initform (error "server must be supplied")))
+    (:documentation "generic semantic web database repository"))
+  
+  (defclass fuseki-repository (repository)
+    ()
+    (:documentation "fuseki sementic web database repository"))
+#+end_src
+
+we will use these classes throughout the code.  they will supply extra requirements on certain code sections.
+
+* Endpoint URLs
+the query, update, data and upload sections may all connect to different connection points.  for Fuseki the fuseki-server objects will always be connected to fuseki-repository objects and vice-versa.
+
+we publish a set of different endpoints for the server endpoints.  the server is responsible for publishing generic data, the repository is responsible for constructing a specific endpoint.
+
+#+source: endpoint-construction
+#+begin_src lisp
+  (defgeneric query-endpoint (repository)
+    (:documentation "SPARQL query endpoint"))
+  (defgeneric update-endpoint (repository)
+    (:documentation "SPARQL Update language endpoint"))
+  (defgeneric data-endpoint (repository)
+    (:documentation "SPARQL HTTP Update endpoint"))
+  (defgeneric upload-endpoint (repository)
+    (:documentation "file upload endpoint"))
+  
+  (defgeneric server-query-endpoint-postfix (server)
+    (:documentation "postfix for the SPARQL query endpoint of the server"))
+  (defgeneric server-update-endpoint-postfix (server)
+    (:documentation "postfix for the SPARQL Update language endpoint of the server"))
+  (defgeneric server-data-endpoint-postfix (server)
+    (:documentation "postfix for the SPARQL HTTP Update endpoint of the server"))
+  (defgeneric server-upload-endpoint-postfix (server)
+    (:documentation "postfix for the file upload endpoint of the server"))
+  
+  (defmethod server-query-endpoint-postfix ((server fuseki-server))
+    "/query")
+  (defmethod server-update-endpoint-postfix ((server fuseki-server))
+    "/update")
+  (defmethod server-data-endpoint-postfix ((server fuseki-server))
+    "/data")
+  (defmethod server-upload-endpoint-postfix ((server fuseki-server))
+    "/upload")
+  
+  (defmethod query-endpoint ((repos fuseki-repository))
+    (let ((server (server repos)))
+      (s+ (base-url server) (name repos) (server-query-endpoint-postfix server))))
+  (defmethod update-endpoint ((repos fuseki-repository))
+    (let ((server (server repos)))
+      (s+ (base-url server) (name repos) (server-update-endpoint-postfix server))))
+  (defmethod data-endpoint ((repos fuseki-repository))
+    (let ((server (server repos)))
+      (s+ (base-url server) (name repos) (server-data-endpoint-postfix server))))
+  (defmethod upload-endpoint ((repos fuseki-repository))
+    (let ((server (server repos)))
+      (s+ (base-url server) (name repos) (server-upload-endpoint-postfix server))))
+#+end_src
+
+* query language
+we implement the most basic query support.  there is no language which makes building SPARQL queries simpler, or which helps in parsing the results up to a certain level.
+
+we support two query functions.  the first one is a generic query function which allows for the easy querying in one string.  there are unnamed optional keys which may alter the query.  these keys aren't necessarily stable, but are noted in [[simplification support]].
+
+#+source: query
+#+begin_src lisp
+  (defgeneric query-raw (repository query &key &allow-other-keys)
+    (:documentation "sends a raw sparql query to the repository.  this is meant to connect to the SPARQL query endpoint.  this version doesn't parse the result.
+    see query for a version which returns a jsown parsed object of results"))
+  
+  (defgeneric query (repository query &key &allow-other-keys)
+    (:documentation "sendsa  sparql query to the repository and returns a jsown-parsed object of results.  calls query-raw for the raw processing."))
+  
+  (defmethod query-raw ((repos fuseki-repository) (query string) &rest options &key &allow-other-keys)
+    (send-request (query-endpoint repos)
+                  :accept (get-data-type-binding :json)
+                  :parameters `(("query" . ,(apply #'query-update-prefixes query options)))))
+  
+  (defmethod query ((repos repository) (query string) &rest options &key &allow-other-keys)
+    (filter (parse (apply #'query-raw repos query options))
+            "results" "bindings"))
+  
+  (defmacro long-query (repository (&rest options &key &allow-other-keys) &body query-forms) 
+    "Provides a nicer visual for for executing a query which contains multiple lines."
+    `(query ,repository
+            (s+ ,@(loop for query in query-forms
+                     append (list query " ")))
+            ,@options))
+#+end_src
+
+* simplification support
+there are several patterns which keep occuring.  whenever there's something that occurs too often, it's been added to this section.  support for these things is optional and may change from time to time.
+
+#+source: simplifications
+#+begin_src lisp :exports none
+<<prefix-support>>
+#+end_src
+
+** sparql prefix
+prefixes occur more often than not.  in order to minimize the amount of typing that needs to be done for these prefixes, we can add a standard set of prefixes to the sent queries.  the query method may choose to ignore these prefixes.
+
+#+source: prefix-support
+#+begin_src lisp :exports none
+<<prefix-support-prefix-variable>>
+<<prefix-support-prefix-struct>>
+<<prefix-support-prefix-p>>
+<<prefix-support-public>>
+<<prefix-support-implementation-public>>
+
+; add standard prefixes
+<<prefix-support-standard-prefixes>>
+#+end_src
+
+*** public interface
+we create two user-end functions, one to create the prefix and one to remove the prefix.  the interface is deliberately kept as simple as possible.
+
+#+source: prefix-support-public
+#+begin_src lisp
+  (defun add-prefix (prefix iri)
+    "Adds a prefix to the set of standard prefixes.  The prefix is the short version, the IRI is the long version.
+     eg: (add-prefix \"rdf\" \"http://www.w3.org/1999/02/22-rdf-syntax-ns#\")"
+    (unless (is-standard-prefix-p prefix)
+      (push (make-prefix :prefix prefix :iri iri)
+            *standard-prefixes*)))
+  
+  (defun rm-prefix (prefix)
+    "Removes a prefix from the set of standard prefixes.  The prefix is the short version.
+     eg: (rm-prefix \"rdf\")"
+    (when (is-standard-prefix-p prefix)
+      (setf *standard-prefixes*
+            (remove-if (lambda (prefix-prefix) (string= prefix prefix-prefix))
+                       *standard-prefixes* :key #'prefix-prefix))))
+#+end_src
+
+there are some prefixes which occur all to often, we include them here by default.
+#+source: prefix-support-standard-prefixes
+#+begin_src lisp
+  (add-prefix "rdf" "http://www.w3.org/1999/02/22-rdf-syntax-ns#")
+  (add-prefix "owl" "http://www.w3.org/2002/07/owl#")
+#+end_src
+
+*** query implementation interface
+towards queries, we provied one function, which adds support for modifying a query with the necessary prefixes.  the function accepts an optional keyword which will remove the additions from the query.
+
+#+source: prefix-support-implementation-public
+#+begin_src lisp
+  (defun query-update-prefixes (query &key (prefix T prefix-p) &allow-other-keys)
+    "Updates the query unless the :prefix keyword has been set to nil."
+    (if (or prefix (not prefix-p))
+        (s+ (apply #'s+ 
+                   (loop for p in *standard-prefixes*
+                      collect (s+ "PREFIX " (prefix-prefix p) ": "
+                                  "<" (prefix-iri p) "> ")))
+            query)
+        
+        query))
+#+end_src
+
+*** interal implementation
+the internal interface consists of some helper functions, a struct and a special variable with a lisp list contained in it.
+
+- prefix struct :: the prefix struct is used to easily store the prefixes.  it consists of the prefix and the iri and autimatically includes some handy helper functions.
+                   #+source: prefix-support-prefix-struct
+                   #+begin_src lisp
+                     (defstruct prefix
+                       (prefix)
+                       (iri))
+                   #+end_src
+- special variable :: we create a special variable which contains all current standard prefixes.  these are the prefixes that can be added to a query.
+     #+source: prefix-support-prefix-variable
+     #+begin_src lisp
+       (defvar *standard-prefixes* nil
+         "contains all the standard prefixes, as prefix objects")
+     #+end_src
+     
+- prefix inclusion check :: some internal functions check whether or not a prefix is included in the current list of standard prefixes.
+     #+source: prefix-support-prefix-p
+     #+begin_src lisp
+       (defun is-standard-prefix-p (prefix)
+         "Checks whether or not the prefixed string is contained in the current list of standard prefixes.
+          Returns non-nil if the prefix string is a known standard prefix."
+         (find prefix *standard-prefixes* :key #'prefix-prefix :test #'string=))
+     #+end_src
+
+* sending and receiving requests
+in cl-opensesame we built some code to support the sending of queries to the server.  we will reuse most of the supportive code from there.  a description of the code will come later on.
+
+#+source: send-receive-request
+#+begin_src lisp
+  (defun parse-ntriples-string (string)
+    "converts an ntriples string into a list of triples (in which each triple is a list of three strings)"
+    (mapcar (lambda (triple)
+              (cl-ppcre:split "\\s+" triple))
+            (cl-ppcre:split "\\s+\\.\\s+" string)))
+  
+  ;; drakma setup
+  (push (cons nil "x-turtle") drakma:*text-content-types*)
+  (push (cons nil "sparql-results+json") drakma:*text-content-types*)
+  
+  ;; data types
+  (defparameter *data-type-bindings* (make-hash-table :test 'eq))
+  
+  (defun get-data-type-binding (symbol)
+    (gethash symbol *data-type-bindings*))
+  
+  (defun (setf get-data-type-binding) (value symbol)
+    (setf (gethash symbol *data-type-bindings*) value))
+  
+  (mapcar (lambda (k-v)
+            (setf (get-data-type-binding (first k-v))
+                  (second k-v)))
+          '((:XML "application/sparql-results+xml")
+            (:JSON "application/sparql-results+json")
+            (:binary "application/x-binary-rdf-results-table")
+            (:RDFXML "application/rdf+xml")
+            (:NTriples "text/plain")
+            (:Turtle "application/x-turtle")
+            (:N3 "text/rdf+n3")
+            (:TriX "application/trix")
+            (:TriG "application/x-trig")
+            (:PlainTextBoolean "text/boolean")))
+  
+  ;; errors
+  (define-condition sesame-exception (error)
+    ((status-code :reader status-code
+                  :initarg :status-code)
+     (response :reader response
+               :initarg :response)))
+  
+  (defmacro remove-key (variable &rest keys)
+    (let ((g-keys (gensym "keys")))
+      `(let ((,g-keys (list ,@keys)))
+         (setf ,variable (loop for (k v) on ,variable by #'cddr
+                            unless (find k ,g-keys)
+                            append (list k v))))))
+  
+  (defun send-request (url &rest html-args &key (wanted-status-codes '(200)) &allow-other-keys)
+    (remove-key html-args :wanted-status-codes)
+    (multiple-value-bind (response status-code)
+        (apply #'http-request url html-args)
+      (unless (and wanted-status-codes
+                   (find status-code wanted-status-codes))
+        (error 'sesame-exception
+               :status-code status-code
+               :response response))
+      response))
+#+end_src
+
+* support functions
+this section contains various helper functions which haven't found their way into libraries just yet.
+
+#+source: support-functions
+#+begin_src lisp
+  (defun s+ (&rest strings)
+    "Concatenates a set of strings"
+    (apply #'concatenate 'string "" strings))
+#+end_src
