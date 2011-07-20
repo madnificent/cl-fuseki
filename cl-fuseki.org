@@ -12,6 +12,8 @@ This file describes the a lisp-api for fuseki.
   <<support-functions>>
   
   <<simplifications>>
+
+  <<postponed-updates>>
   
   <<send-receive-request>>
   
@@ -60,6 +62,8 @@ the package is exported to a separate file.  you should be able to #'use-package
 * Base classes
 we denote the difference between a server and a repository, even though both may be very similar in construction.  besides that we introduce the difference between a server and a fuseki-server, and between a repository and a fuseki-repository.  this may help in extending the library for related systems in the future.
 
+the repository has a postponed-updates query, this is a cache which is explained in [[postponed updates]].
+
 #+source: base-classes
 #+begin_src lisp
   (defclass server ()
@@ -78,7 +82,8 @@ we denote the difference between a server and a repository, even though both may
            :initform "")
      (server :accessor server
              :initarg :server
-             :initform (error "server must be supplied")))
+             :initform (error "server must be supplied"))
+     (postponed-updates :initform (make-hash-table :test 'equal)))
     (:documentation "generic semantic web database repository"))
   
   (defclass fuseki-repository (repository)
@@ -151,6 +156,7 @@ we support two query functions.  the first one is a generic query function which
     (:documentation "sends a sparql query to the repository and returns a jsown-parsed object of results.  calls query-raw for the raw processing."))
   
   (defmethod query-raw ((repos fuseki-repository) (query string) &rest options &key &allow-other-keys)
+    (flush-updates repos)
     (send-request (query-endpoint repos)
                   :accept (get-data-type-binding :json)
                   :parameters `(("query" . ,(apply #'query-update-prefixes query options)))))
@@ -178,11 +184,15 @@ the query language sported two query functions, providing different ways of rece
     (:documentation "sends a sparql update to the repository."))
   
   (defmethod update ((repos fuseki-repository) (update string) &rest options &key &allow-other-keys)
-    (send-request (update-endpoint repos)
-                  :wanted-status-codes '(200 204) ; only 204 is in the spec
-                  :content-type "application/sparql-update" ; fuseki-specific
-                  :method :post
-                  :content (apply #'query-update-prefixes update options)))
+    (apply #'maybe-postpone-update 
+           repos
+           (lambda ()
+             (send-request (update-endpoint repos)
+                           :wanted-status-codes '(200 204) ; only 204 is in the spec
+                           :content-type "application/sparql-update" ; fuseki-specific
+                           :method :post
+                           :content (apply #'query-update-prefixes update options)))
+           options))
   
   (defmacro long-update (repository (&rest options &key &allow-other-keys) &body query-forms) 
     "Provides a nicer visual for for executing an update query which contains multiple lines."
@@ -190,6 +200,47 @@ the query language sported two query functions, providing different ways of rece
             (s+ ,@(loop for query in query-forms
                      append (list query " ")))
             ,@options))
+#+end_src
+
+* postponed updates
+in some cases we may want to send updates only if a query occurs later on.  this can be so in cases where we're using the database as a reasoning entity.  for this reason we create the following two functions which will help in registering and querying postponed updates for the server.  as an added bonus, we introduce a variable which can be set to disable the postponed updates, as this can be handy for debugging or benchmarking.
+
+#+source: postponed-updates
+#+begin_src lisp
+  (defparameter *do-postponed-updates* T)
+  
+  (defun maybe-postpone-update (repository functor &key
+                                (deposit nil depositp)
+                                (revoke nil revokep))
+    "performs the update in a postponed fashion if deposit contains a key named deposit.  the update will be executed if a flush-updates function is called, or if a query is executed.  if another query with a revoke of a yet-to-be-executed update with a deposit-key that equals to that key is sent, then neither the query with the equaled deposit key as the query with the equaled revoke key will be executed."
+    (if (and *do-postponed-updates*
+             (not (or depositp revokep)))
+        (funcall functor)
+        (if depositp
+            (progn
+              ; (format T "depositing for ~A~&" deposit)
+              (setf (gethash deposit
+                             (slot-value repository
+                                         'postponed-updates))
+                    functor))
+            (progn
+              ; (format T "revoking for ~A~&" revoke)
+              (unless (remhash revoke
+                               (slot-value repository
+                                           'postponed-updates))
+                ; (format T "executing revoked for ~A~&" revoke)
+                (funcall functor))))))
+  
+  (defun flush-updates (repository)
+    "performs all postponed updates which still need to be executed"
+    (let* ((hash (slot-value repository 'postponed-updates))
+           (keys (loop for key being the hash-keys of hash
+                    collect key)))
+      (dolist (key keys)
+        ; (format T "flushing ~A~&" key)
+        (funcall (gethash key hash)))
+      (dolist (key keys)
+        (remhash key hash))))
 #+end_src
 
 * simplification support
