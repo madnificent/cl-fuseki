@@ -217,19 +217,14 @@ in some cases we may want to send updates only if a query occurs later on.  this
              (not (or depositp revokep)))
         (funcall functor)
         (if depositp
-            (progn
-              ; (format T "depositing for ~A~&" deposit)
-              (setf (gethash deposit
+            (setf (gethash deposit
+                           (slot-value repository
+                                       'postponed-updates))
+                  functor)
+            (unless (remhash revoke
                              (slot-value repository
                                          'postponed-updates))
-                    functor))
-            (progn
-              ; (format T "revoking for ~A~&" revoke)
-              (unless (remhash revoke
-                               (slot-value repository
-                                           'postponed-updates))
-                ; (format T "executing revoked for ~A~&" revoke)
-                (funcall functor))))))
+              (funcall functor)))))
   
   (defun flush-updates (repository)
     "performs all postponed updates which still need to be executed"
@@ -237,7 +232,6 @@ in some cases we may want to send updates only if a query occurs later on.  this
            (keys (loop for key being the hash-keys of hash
                     collect key)))
       (dolist (key keys)
-        ; (format T "flushing ~A~&" key)
         (funcall (gethash key hash)))
       (dolist (key keys)
         (remhash key hash))))
@@ -248,7 +242,7 @@ there are several patterns which keep occuring.  whenever there's something that
 
 #+source: simplifications
 #+begin_src lisp :exports none
-<<prefix-support>>
+  <<prefix-support>>
 #+end_src
 
 ** sparql prefix
@@ -307,7 +301,6 @@ towards queries, we provied one function, which adds support for modifying a que
                       collect (s+ "PREFIX " (prefix-prefix p) ": "
                                   "<" (prefix-iri p) "> ")))
             query)
-        
         query))
 #+end_src
 
