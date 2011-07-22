@@ -87,8 +87,8 @@ the repository has a postponed-updates query, this is a cache which is explained
      (server :accessor server
              :initarg :server
              :initform (error "server must be supplied"))
-     (postponed-updates :initform (make-hash-table :test 'equal)
-                        :accessor postponed-updates))
+     (postponed-updates :initform (make-hash-table :test 'equal))
+     (unnamed-postponed-updates :initform nil))
     (:documentation "generic semantic web database repository"))
   
   (defclass fuseki-repository (repository)
@@ -258,19 +258,27 @@ in some cases we may want to send updates only if a query occurs later on.  this
             (unless (remhash revoke
                              (slot-value repository
                                          'postponed-updates))
-              (update-now repository 
-                          (query-update-prefixes update-string))))))
+              ;; TODO check semantics of this postponed update
+              ;;  wrt database correctness
+              ;; (update-now repository 
+              ;;             (query-update-prefixes update-string))
+              (push update-string (slot-value repository
+                                              'unnamed-postponed-updates))))))
   
   (defun flush-updates (repository)
     "performs all postponed updates which still need to be executed"
     (let* ((hash (slot-value repository 'postponed-updates))
+           (update-list (slot-value repository 'unnamed-postponed-updates))
            (keys (loop for key being the hash-keys of hash
                     collect key)))
       (update-now repository
                   (query-update-prefixes 
-                   (apply #'s+ (loop for key in keys
-                                  append (list (gethash key hash)
-                                               (format nil " ~%"))))))
+                   (s+ (apply #'s+ (loop for item in update-list
+                                      append (list item (format nil " ~%"))))
+                       (apply #'s+ (loop for key in keys
+                                      append (list (gethash key hash)
+                                                   (format nil " ~%")))))))
+      (setf (slot-value repository 'unnamed-postponed-updates) nil)
       (dolist (key keys)
         (remhash key hash))))
 #+end_src
