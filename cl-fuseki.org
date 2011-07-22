@@ -87,7 +87,8 @@ the repository has a postponed-updates query, this is a cache which is explained
      (server :accessor server
              :initarg :server
              :initform (error "server must be supplied"))
-     (postponed-updates :initform (make-hash-table :test 'equal)))
+     (postponed-updates :initform (make-hash-table :test 'equal)
+                        :accessor postponed-updates))
     (:documentation "generic semantic web database repository"))
   
   (defclass fuseki-repository (repository)
@@ -186,16 +187,20 @@ the query language sported two query functions, providing different ways of rece
 #+begin_src lisp
   (defgeneric update (repository query &key &allow-other-keys)
     (:documentation "sends a sparql update to the repository."))
+  (defgeneric update-now (repository query)
+    (:documentation "sends a sparql update query to the repository without waiting for anything"))
+  
+  (defmethod update-now ((repos fuseki-repository) (update string))
+    (send-request (update-endpoint repos)
+                           :wanted-status-codes '(200 204) ; only 204 is in the spec
+                           :content-type "application/sparql-update" ; fuseki-specific
+                           :method :post
+                           :content update))
   
   (defmethod update ((repos fuseki-repository) (update string) &rest options &key &allow-other-keys)
     (apply #'maybe-postpone-update 
            repos
-           (lambda ()
-             (send-request (update-endpoint repos)
-                           :wanted-status-codes '(200 204) ; only 204 is in the spec
-                           :content-type "application/sparql-update" ; fuseki-specific
-                           :method :post
-                           :content (apply #'query-update-prefixes update options)))
+           update
            options))
   
   (defmacro long-update (repository (&rest options &key &allow-other-keys) &body query-forms) 
@@ -213,9 +218,8 @@ next we provide an explicit interface for update and delete queries.  the reques
   (defmacro insert (repository (&rest options)
                     &body format)
     `(update ,repository
-             (s+ "INSERT DATA { "
-                 (format nil ,@format)
-                 " }")
+             (format nil "~&INSERT DATA~&{~A~&}"
+                     (format nil ,@format))
              ,@options))
   
   (defmacro delete (repository (&rest options)
@@ -230,34 +234,43 @@ next we provide an explicit interface for update and delete queries.  the reques
 * postponed updates
 in some cases we may want to send updates only if a query occurs later on.  this can be so in cases where we're using the database as a reasoning entity.  for this reason we create the following two functions which will help in registering and querying postponed updates for the server.  as an added bonus, we introduce a variable which can be set to disable the postponed updates, as this can be handy for debugging or benchmarking.
 
+*warning* the postponed updates system does /not/ work when using multiple repositories in a single image.
+
 #+source: postponed-updates
 #+begin_src lisp
   (defparameter *do-postponed-updates* T)
   
-  (defun maybe-postpone-update (repository functor &key
+  (defun maybe-postpone-update (repository update-string &rest options &key
                                 (deposit nil depositp)
-                                (revoke nil revokep))
+                                (revoke nil revokep) &allow-other-keys)
     "performs the update in a postponed fashion if deposit contains a key named deposit.  the update will be executed if a flush-updates function is called, or if a query is executed.  if another query with a revoke of a yet-to-be-executed update with a deposit-key that equals to that key is sent, then neither the query with the equaled deposit key as the query with the equaled revoke key will be executed."
-    (if (and *do-postponed-updates*
-             (not (or depositp revokep)))
-        (funcall functor)
+    (if (or (not *do-postponed-updates*)
+            (not (or depositp revokep)))
+        (update-now repository
+                    (apply #'query-update-prefixes
+                           update-string
+                           options))
         (if depositp
             (setf (gethash deposit
                            (slot-value repository
                                        'postponed-updates))
-                  functor)
+                  update-string)
             (unless (remhash revoke
                              (slot-value repository
                                          'postponed-updates))
-              (funcall functor)))))
+              (update-now repository 
+                          (query-update-prefixes update-string))))))
   
   (defun flush-updates (repository)
     "performs all postponed updates which still need to be executed"
     (let* ((hash (slot-value repository 'postponed-updates))
            (keys (loop for key being the hash-keys of hash
                     collect key)))
-      (dolist (key keys)
-        (funcall (gethash key hash)))
+      (update-now repository
+                  (query-update-prefixes 
+                   (apply #'s+ (loop for key in keys
+                                  append (list (gethash key hash)
+                                               (format nil " ~%"))))))
       (dolist (key keys)
         (remhash key hash))))
 #+end_src
