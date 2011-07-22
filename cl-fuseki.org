@@ -23,6 +23,7 @@ This file describes the a lisp-api for fuseki.
   
   <<query>>
   <<update>>
+  <<insert-and-delete>>
 #+end_src
 
 * Package description
@@ -47,15 +48,18 @@ the package is exported to a separate file.  you should be able to #'use-package
 #+begin_src lisp :tangle packages.lisp
   (defpackage :cl-fuseki
     (:nicknames :fuseki)
+    (:shadow :delete)
     (:use :cl :drakma :cl-ppcre :jsown)
     (:export :fuseki-server :fuseki-repository
              :name
              :query :long-query
              :update :long-update
-             :add-prefix :rm-prefix))
+             :add-prefix :rm-prefix
+             :insert :delete))
   
   (defpackage :cl-fuseki-user
     (:nicknames :fuseki-user)
+    (:shadowing-import-from :fuseki :delete)
     (:use :cl :cl-fuseki :jsown))
 #+end_src
 
@@ -200,6 +204,27 @@ the query language sported two query functions, providing different ways of rece
             (s+ ,@(loop for query in query-forms
                      append (list query " ")))
             ,@options))
+#+end_src
+
+next we provide an explicit interface for update and delete queries.  the requests in these functions use the standard header but take their other arguments in an equivalent way to the update method.
+
+#+source: insert-and-delete
+#+begin_src lisp
+  (defmacro insert (repository (&rest options)
+                    &body format)
+    `(update ,repository
+             (s+ "INSERT DATA { "
+                 (format nil ,@format)
+                 " }")
+             ,@options))
+  
+  (defmacro delete (repository (&rest options)
+                    &body format)
+    `(update ,repository
+             (s+ "DELETE DATA { "
+                 (format nil ,@format)
+                 " }")
+             ,@options))
 #+end_src
 
 * postponed updates
