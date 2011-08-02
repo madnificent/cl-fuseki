@@ -234,8 +234,6 @@ next we provide an explicit interface for update and delete queries.  the reques
 * postponed updates
 in some cases we may want to send updates only if a query occurs later on.  this can be so in cases where we're using the database as a reasoning entity.  for this reason we create the following two functions which will help in registering and querying postponed updates for the server.  as an added bonus, we introduce a variable which can be set to disable the postponed updates, as this can be handy for debugging or benchmarking.
 
-*warning* the postponed updates system does /not/ work when using multiple repositories in a single image.
-
 #+source: postponed-updates
 #+begin_src lisp
   (defparameter *do-postponed-updates* T)
@@ -335,7 +333,7 @@ there are some prefixes which occur all to often, we include them here by defaul
 #+end_src
 
 *** query implementation interface
-towards queries, we provied one function, which adds support for modifying a query with the necessary prefixes.  the function accepts an optional keyword which will remove the additions from the query.
+towards queries, we provide one function.  it adds support for modifying a query with the necessary prefixes.  the function accepts an optional keyword which will remove the additions from the query.
 
 #+source: prefix-support-implementation-public
 #+begin_src lisp
