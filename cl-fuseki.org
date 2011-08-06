@@ -23,6 +23,7 @@ This file describes the a lisp-api for fuseki.
   
   <<query>>
   <<update>>
+  <<ask>>
   <<insert-and-delete>>
 #+end_src
 
@@ -54,6 +55,7 @@ the package is exported to a separate file.  you should be able to #'use-package
              :name
              :query :long-query
              :update :long-update
+             :ask
              :add-prefix :rm-prefix
              :insert :delete))
   
@@ -229,6 +231,22 @@ next we provide an explicit interface for update and delete queries.  the reques
                  (format nil ,@format)
                  " }")
              ,@options))
+#+end_src
+
+* ask language
+the ask language is simple, it sends the given ASK query to the database and returns T if the database answered positively and NIL if the database answered negatively.
+
+the implementation is analogous to the implementation of query, we reuse raw-query.
+
+#+source: ask
+#+begin_src lisp
+  (defgeneric ask (repository query &key &allow-other-keys)
+    (:documentation "sends a sparql ask query to the repository and returns T if the answer was positive or NIL if the ansewer was negative.  calls query-raw for the raw processing."))
+  
+  (defmethod ask ((repos repository) (query string) &rest options &key &allow-other-keys)
+    (val (parse 
+          (apply #'query-raw repos query options))
+         "boolean"))
 #+end_src
 
 * postponed updates
