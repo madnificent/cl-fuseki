@@ -1,4 +1,4 @@
-cl-fuseki - semantic web database connection
+cl-fuseki - Semantic Web Database Connection
 
 #+tags: code lisp thesis rdf owl database semanticweb
 #+BABEL: :tangle no :cache no :session yes :results silent :no-expand yes :noweb yes :exports code
@@ -28,7 +28,7 @@ This file describes the a lisp-api for fuseki.
 #+end_src
 
 * Package description
-cl-fuseki uses asdf for loading the library.  it depends on jsown, drakma and cl-ppcre, all available through quicklisp.
+cl-fuseki uses asdf for loading the library.  It depends on jsown, drakma and cl-ppcre, all available through quicklisp.
 
 #+begin_src lisp :tangle cl-fuseki.asd
   (asdf:defsystem :cl-fuseki
@@ -44,7 +44,7 @@ cl-fuseki uses asdf for loading the library.  it depends on jsown, drakma and cl
                  (:file "cl-fuseki")))
 #+end_src
 
-the package is exported to a separate file.  you should be able to #'use-package this in a lisp-environment containing only :cl
+The package is exported to a separate file.  You should be able to #'use-package this in a lisp-environment containing only :cl
 
 #+begin_src lisp :tangle packages.lisp
   (defpackage :cl-fuseki
@@ -66,9 +66,9 @@ the package is exported to a separate file.  you should be able to #'use-package
 #+end_src
 
 * Base classes
-we denote the difference between a server and a repository, even though both may be very similar in construction.  besides that we introduce the difference between a server and a fuseki-server, and between a repository and a fuseki-repository.  this may help in extending the library for related systems in the future.
+We denote the difference between a server and a repository, even though both may be very similar in construction.  Besides that we introduce the difference between a server and a fuseki-server, and between a repository and a fuseki-repository.  This may help in extending the library for related systems in the future.
 
-the repository has a postponed-updates query, this is a cache which is explained in [[postponed updates]].
+The repository has a postponed-updates query, this is a cache which is explained in [[postponed updates]].
 
 #+source: base-classes
 #+begin_src lisp
@@ -98,12 +98,12 @@ the repository has a postponed-updates query, this is a cache which is explained
     (:documentation "fuseki sementic web database repository"))
 #+end_src
 
-we will use these classes throughout the code.  they will supply extra requirements on certain code sections.
+We will use these classes throughout the code.  They will supply extra requirements on certain code sections.
 
 * Endpoint URLs
-the query, update, data and upload sections may all connect to different connection points.  for Fuseki the fuseki-server objects will always be connected to fuseki-repository objects and vice-versa.
+The query, update, data and upload sections may all connect to different connection points.  For Fuseki the fuseki-server objects will always be connected to fuseki-repository objects and vice-versa.
 
-we publish a set of different endpoints for the server endpoints.  the server is responsible for publishing generic data, the repository is responsible for constructing a specific endpoint.
+We publish a set of different endpoints for the server endpoints.  The server is responsible for publishing generic data, the repository is responsible for constructing a specific endpoint.
 
 #+source: endpoint-construction
 #+begin_src lisp
@@ -148,10 +148,10 @@ we publish a set of different endpoints for the server endpoints.  the server is
       (s+ (base-url server) (name repos) (server-upload-endpoint-postfix server))))
 #+end_src
 
-* query language
-we implement the most basic query support.  there is no language which makes building SPARQL queries simpler, or which helps in parsing the results up to a certain level.
+* Query language
+We implement the most basic query support.  There is no language which makes building SPARQL queries simpler, or which helps in parsing the results up to a certain level.
 
-we support two query functions.  the first one is a generic query function which allows for the easy querying in one string.  there are unnamed optional keys which may alter the query.  these keys aren't necessarily stable, but are noted in [[simplification support]].
+We support two query functions.  The first one is a generic query function which allows for the easy querying in one string.  There are unnamed optional keys which may alter the query.  These keys aren't necessarily stable, but are noted in [[simplification support]].
 
 #+source: query
 #+begin_src lisp
@@ -180,10 +180,10 @@ we support two query functions.  the first one is a generic query function which
             ,@options))
 #+end_src
 
-* update language
-we implement the most basic update support and take the same approach as the one taken in [[query language]].  there is no language which makes building SPARQL updates simpler, or which helps in parsing the results up to a certain level.
+* Update language
+We implement the most basic update support and take the same approach as the one taken in [[query language]].  There is no language which makes building SPARQL updates simpler, or which helps in parsing the results up to a certain level.
 
-the query language sported two query functions, providing different ways of receiving the parsed result.  as the update queries don't supply us with any meaningful information, we only support one version here.  there is an analogous function to long-query, named long-update.  there are unnamed optional keys which may alter the update.  these keys aren't necessarily stable, but are noted in [[simplification support]].
+The query language sported two query functions, providing different ways of receiving the parsed result.  As the update queries don't supply us with any meaningful information, we only support one version here.  There is an analogous function to long-query, named long-update.  There are unnamed optional keys which may alter the update.  These keys aren't necessarily stable, but are noted in [[simplification support]].
 
 #+source: update
 #+begin_src lisp
@@ -213,7 +213,7 @@ the query language sported two query functions, providing different ways of rece
             ,@options))
 #+end_src
 
-next we provide an explicit interface for update and delete queries.  the requests in these functions use the standard header but take their other arguments in an equivalent way to the update method.
+Next we provide an explicit interface for update and delete queries.  The requests in these functions use the standard header but take their other arguments in an equivalent way to the update method.
 
 #+source: insert-and-delete
 #+begin_src lisp
@@ -233,10 +233,10 @@ next we provide an explicit interface for update and delete queries.  the reques
              ,@options))
 #+end_src
 
-* ask language
-the ask language is simple, it sends the given ASK query to the database and returns T if the database answered positively and NIL if the database answered negatively.
+* Ask language
+The ask language is simple, it sends the given ASK query to the database and returns T if the database answered positively and NIL if the database answered negatively.
 
-the implementation is analogous to the implementation of query, we reuse raw-query.
+The implementation is analogous to the implementation of query, we reuse raw-query.
 
 #+source: ask
 #+begin_src lisp
@@ -249,8 +249,14 @@ the implementation is analogous to the implementation of query, we reuse raw-que
          "boolean"))
 #+end_src
 
-* postponed updates
-in some cases we may want to send updates only if a query occurs later on.  this can be so in cases where we're using the database as a reasoning entity.  for this reason we create the following two functions which will help in registering and querying postponed updates for the server.  as an added bonus, we introduce a variable which can be set to disable the postponed updates, as this can be handy for debugging or benchmarking.
+* Postponed updates
+In some cases we may want to send updates only if a query occurs later on.  This can be so in cases where we're using the database as a reasoning entity.  For this reason we create the following two functions which will help in registering and querying postponed updates for the server.  As an added bonus, we introduce a variable which can be set to disable the postponed updates, as this can be handy for debugging or benchmarking.
+
+# TODO check semantics of this postponed update
+#      wrt database correctness
+# (update-now repository 
+#             (query-update-prefixes update-string))
+
 
 #+source: postponed-updates
 #+begin_src lisp
@@ -274,12 +280,9 @@ in some cases we may want to send updates only if a query occurs later on.  this
             (unless (remhash revoke
                              (slot-value repository
                                          'postponed-updates))
-              ;; TODO check semantics of this postponed update
-              ;;  wrt database correctness
-              ;; (update-now repository 
-              ;;             (query-update-prefixes update-string))
-              (push update-string (slot-value repository
-                                              'unnamed-postponed-updates))))))
+              (push update-string
+                    (slot-value repository
+                                'unnamed-postponed-updates))))))
   
   (defun flush-updates (repository)
     "performs all postponed updates which still need to be executed"
@@ -299,16 +302,16 @@ in some cases we may want to send updates only if a query occurs later on.  this
         (remhash key hash))))
 #+end_src
 
-* simplification support
-there are several patterns which keep occuring.  whenever there's something that occurs too often, it's been added to this section.  support for these things is optional and may change from time to time.
+* Simplification support
+There are several patterns which keep occuring.  Whenever there's something that occurs too often, it's been added to this section.  Support for these things is optional and may change from time to time.
 
 #+source: simplifications
 #+begin_src lisp :exports none
   <<prefix-support>>
 #+end_src
 
-** sparql prefix
-prefixes occur more often than not.  in order to minimize the amount of typing that needs to be done for these prefixes, we can add a standard set of prefixes to the sent queries/updates.  the query/update method may choose to ignore these prefixes.
+** Sparql prefix
+Prefixes occur more often than not.  In order to minimize the amount of typing that needs to be done for these prefixes, we can add a standard set of prefixes to the sent queries/updates.  The query/update method may choose to ignore these prefixes.
 
 #+source: prefix-support
 #+begin_src lisp :exports none
@@ -322,8 +325,8 @@ prefixes occur more often than not.  in order to minimize the amount of typing t
 <<prefix-support-standard-prefixes>>
 #+end_src
 
-*** public interface
-we create two user-end functions, one to create the prefix and one to remove the prefix.  the interface is deliberately kept as simple as possible.
+*** Public interface
+We create two user-end functions, one to create the prefix and one to remove the prefix.  The interface is deliberately kept as simple as possible.
 
 #+source: prefix-support-public
 #+begin_src lisp
@@ -343,15 +346,15 @@ we create two user-end functions, one to create the prefix and one to remove the
                        *standard-prefixes* :key #'prefix-prefix))))
 #+end_src
 
-there are some prefixes which occur all to often, we include them here by default.
+There are some prefixes which occur all to often, we include them here by default.
 #+source: prefix-support-standard-prefixes
 #+begin_src lisp
   (add-prefix "rdf" "http://www.w3.org/1999/02/22-rdf-syntax-ns#")
   (add-prefix "owl" "http://www.w3.org/2002/07/owl#")
 #+end_src
 
-*** query implementation interface
-towards queries, we provide one function.  it adds support for modifying a query with the necessary prefixes.  the function accepts an optional keyword which will remove the additions from the query.
+*** Query implementation interface
+Towards queries, we provide one function.  It adds support for modifying a query with the necessary prefixes.  The function accepts an optional keyword which will remove the additions from the query.
 
 #+source: prefix-support-implementation-public
 #+begin_src lisp
@@ -366,24 +369,24 @@ towards queries, we provide one function.  it adds support for modifying a query
         query))
 #+end_src
 
-*** interal implementation
-the internal interface consists of some helper functions, a struct and a special variable with a lisp list contained in it.
+*** Interal implementation
+The internal interface consists of some helper functions, a struct and a special variable with a lisp list contained in it.
 
-- prefix struct :: the prefix struct is used to easily store the prefixes.  it consists of the prefix and the iri and autimatically includes some handy helper functions.
+- prefix struct :: The prefix struct is used to easily store the prefixes.  It consists of the prefix and the iri and autimatically includes some handy helper functions.
                    #+source: prefix-support-prefix-struct
                    #+begin_src lisp
                      (defstruct prefix
                        (prefix)
                        (iri))
                    #+end_src
-- special variable :: we create a special variable which contains all current standard prefixes.  these are the prefixes that can be added to a query.
+- special variable :: We create a special variable which contains all current standard prefixes.  These are the prefixes that can be added to a query.
      #+source: prefix-support-prefix-variable
      #+begin_src lisp
        (defvar *standard-prefixes* nil
          "contains all the standard prefixes, as prefix objects")
      #+end_src
      
-- prefix inclusion check :: some internal functions check whether or not a prefix is included in the current list of standard prefixes.
+- prefix inclusion check :: Some internal functions check whether or not a prefix is included in the current list of standard prefixes.
      #+source: prefix-support-prefix-p
      #+begin_src lisp
        (defun is-standard-prefix-p (prefix)
@@ -392,8 +395,8 @@ the internal interface consists of some helper functions, a struct and a special
          (find prefix *standard-prefixes* :key #'prefix-prefix :test #'string=))
      #+end_src
 
-* sending and receiving requests
-in cl-opensesame we built some code to support the sending of queries to the server.  we will reuse most of the supportive code from there.  a description of the code will come later on.
+* Sending and receiving requests
+For communicating with the server itself, we use drakma.  The following code allows us to send a request to the server and to parse the resulting triples.
 
 #+source: send-receive-request
 #+begin_src lisp
@@ -456,8 +459,8 @@ in cl-opensesame we built some code to support the sending of queries to the ser
       response))
 #+end_src
 
-* support functions
-this section contains various helper functions which haven't found their way into libraries just yet.
+* Support functions
+This section contains various helper functions which haven't found their way into libraries just yet.
 
 #+source: support-functions
 #+begin_src lisp
