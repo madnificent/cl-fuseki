@@ -1,7 +1,7 @@
 cl-fuseki - Semantic Web Database Connection
 
 #+tags: code lisp thesis rdf owl database semanticweb
-#+BABEL: :tangle no :cache no :session yes :results silent :no-expand yes :noweb yes :exports code
+#+PROPERTY: header-args :tangle no :cache no :session yes :results silent :no-expand no :noweb yes :exports code
 #+startup: hideblocks overview
 
 This file describes the a lisp-api for fuseki.
@@ -26,6 +26,9 @@ This file describes the a lisp-api for fuseki.
   <<ask>>
   <<insert-and-delete>>
 #+end_src
+
+#+RESULTS:
+: #<package "CL-FUSEKI">
 
 * Package description
 cl-fuseki uses asdf for loading the library.  It depends on jsown, drakma and cl-ppcre, all available through quicklisp.
@@ -70,7 +73,7 @@ We denote the difference between a server and a repository, even though both may
 
 The repository has a postponed-updates query, this is a cache which is explained in [[postponed updates]].
 
-#+source: base-classes
+#+name: base-classes
 #+begin_src lisp
   (defclass server ()
     ((base-url :accessor base-url
@@ -105,7 +108,7 @@ The query, update, data and upload sections may all connect to different connect
 
 We publish a set of different endpoints for the server endpoints.  The server is responsible for publishing generic data, the repository is responsible for constructing a specific endpoint.
 
-#+source: endpoint-construction
+#+name: endpoint-construction
 #+begin_src lisp
   (defgeneric query-endpoint (repository)
     (:documentation "SPARQL query endpoint"))
@@ -153,7 +156,7 @@ We implement the most basic query support.  There is no language which makes bui
 
 We support two query functions.  The first one is a generic query function which allows for the easy querying in one string.  There are unnamed optional keys which may alter the query.  These keys aren't necessarily stable, but are noted in [[simplification support]].
 
-#+source: query
+#+name: query
 #+begin_src lisp
   (defgeneric query-raw (repository query &key &allow-other-keys)
     (:documentation "sends a raw sparql query to the repository.  this is meant to connect to the SPARQL query endpoint.  this version doesn't parse the result.
@@ -185,7 +188,7 @@ We implement the most basic update support and take the same approach as the one
 
 The query language sported two query functions, providing different ways of receiving the parsed result.  As the update queries don't supply us with any meaningful information, we only support one version here.  There is an analogous function to long-query, named long-update.  There are unnamed optional keys which may alter the update.  These keys aren't necessarily stable, but are noted in [[simplification support]].
 
-#+source: update
+#+name: update
 #+begin_src lisp
   (defgeneric update (repository query &key &allow-other-keys)
     (:documentation "sends a sparql update to the repository."))
@@ -215,7 +218,7 @@ The query language sported two query functions, providing different ways of rece
 
 Next we provide an explicit interface for update and delete queries.  The requests in these functions use the standard header but take their other arguments in an equivalent way to the update method.
 
-#+source: insert-and-delete
+#+name: insert-and-delete
 #+begin_src lisp
   (defmacro insert (repository (&rest options)
                     &body format)
@@ -238,7 +241,7 @@ The ask language is simple, it sends the given ASK query to the database and ret
 
 The implementation is analogous to the implementation of query, we reuse raw-query.
 
-#+source: ask
+#+name: ask
 #+begin_src lisp
   (defgeneric ask (repository query &key &allow-other-keys)
     (:documentation "sends a sparql ask query to the repository and returns T if the answer was positive or NIL if the ansewer was negative.  calls query-raw for the raw processing."))
@@ -258,7 +261,7 @@ In some cases we may want to send updates only if a query occurs later on.  This
 #             (query-update-prefixes update-string))
 
 
-#+source: postponed-updates
+#+name: postponed-updates
 #+begin_src lisp
   (defparameter *do-postponed-updates* T)
   
@@ -305,7 +308,7 @@ In some cases we may want to send updates only if a query occurs later on.  This
 * Simplification support
 There are several patterns which keep occuring.  Whenever there's something that occurs too often, it's been added to this section.  Support for these things is optional and may change from time to time.
 
-#+source: simplifications
+#+name: simplifications
 #+begin_src lisp :exports none
   <<prefix-support>>
 #+end_src
@@ -313,7 +316,7 @@ There are several patterns which keep occuring.  Whenever there's something that
 ** Sparql prefix
 Prefixes occur more often than not.  In order to minimize the amount of typing that needs to be done for these prefixes, we can add a standard set of prefixes to the sent queries/updates.  The query/update method may choose to ignore these prefixes.
 
-#+source: prefix-support
+#+name: prefix-support
 #+begin_src lisp :exports none
 <<prefix-support-prefix-variable>>
 <<prefix-support-prefix-struct>>
@@ -328,7 +331,7 @@ Prefixes occur more often than not.  In order to minimize the amount of typing t
 *** Public interface
 We create two user-end functions, one to create the prefix and one to remove the prefix.  The interface is deliberately kept as simple as possible.
 
-#+source: prefix-support-public
+#+name: prefix-support-public
 #+begin_src lisp
   (defun add-prefix (prefix iri)
     "Adds a prefix to the set of standard prefixes.  The prefix is the short version, the IRI is the long version.
@@ -347,7 +350,7 @@ We create two user-end functions, one to create the prefix and one to remove the
 #+end_src
 
 There are some prefixes which occur all to often, we include them here by default.
-#+source: prefix-support-standard-prefixes
+#+name: prefix-support-standard-prefixes
 #+begin_src lisp
   (add-prefix "rdf" "http://www.w3.org/1999/02/22-rdf-syntax-ns#")
   (add-prefix "owl" "http://www.w3.org/2002/07/owl#")
@@ -356,7 +359,7 @@ There are some prefixes which occur all to often, we include them here by defaul
 *** Query implementation interface
 Towards queries, we provide one function.  It adds support for modifying a query with the necessary prefixes.  The function accepts an optional keyword which will remove the additions from the query.
 
-#+source: prefix-support-implementation-public
+#+name: prefix-support-implementation-public
 #+begin_src lisp
   (defun query-update-prefixes (query &key (prefix T prefix-p) &allow-other-keys)
     "Updates the query unless the :prefix keyword has been set to nil."
@@ -373,21 +376,21 @@ Towards queries, we provide one function.  It adds support for modifying a query
 The internal interface consists of some helper functions, a struct and a special variable with a lisp list contained in it.
 
 - prefix struct :: The prefix struct is used to easily store the prefixes.  It consists of the prefix and the iri and autimatically includes some handy helper functions.
-                   #+source: prefix-support-prefix-struct
+                   #+name: prefix-support-prefix-struct
                    #+begin_src lisp
                      (defstruct prefix
                        (prefix)
                        (iri))
                    #+end_src
 - special variable :: We create a special variable which contains all current standard prefixes.  These are the prefixes that can be added to a query.
-     #+source: prefix-support-prefix-variable
+     #+name: prefix-support-prefix-variable
      #+begin_src lisp
        (defvar *standard-prefixes* nil
          "contains all the standard prefixes, as prefix objects")
      #+end_src
      
 - prefix inclusion check :: Some internal functions check whether or not a prefix is included in the current list of standard prefixes.
-     #+source: prefix-support-prefix-p
+     #+name: prefix-support-prefix-p
      #+begin_src lisp
        (defun is-standard-prefix-p (prefix)
          "Checks whether or not the prefixed string is contained in the current list of standard prefixes.
@@ -398,7 +401,7 @@ The internal interface consists of some helper functions, a struct and a special
 * Sending and receiving requests
 For communicating with the server itself, we use drakma.  The following code allows us to send a request to the server and to parse the resulting triples.
 
-#+source: send-receive-request
+#+name: send-receive-request
 #+begin_src lisp
   (defun parse-ntriples-string (string)
     "converts an ntriples string into a list of triples (in which each triple is a list of three strings)"
@@ -462,7 +465,7 @@ For communicating with the server itself, we use drakma.  The following code all
 * Support functions
 This section contains various helper functions which haven't found their way into libraries just yet.
 
-#+source: support-functions
+#+name: support-functions
 #+begin_src lisp
   (defun s+ (&rest strings)
     "Concatenates a set of strings"
