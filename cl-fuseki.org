@@ -85,6 +85,10 @@ The repository has a postponed-updates query, this is a cache which is explained
     ()
     (:documentation "fuseki semantic web database server"))
   
+  (defclass virtuoso-server (server)
+    ()
+    (:documentation "Virtuoso sparql endpoint"))
+  
   (defclass repository ()
     ((name :accessor name
            :initarg :name
@@ -99,6 +103,10 @@ The repository has a postponed-updates query, this is a cache which is explained
   (defclass fuseki-repository (repository)
     ()
     (:documentation "fuseki sementic web database repository"))
+  
+  (defclass virtuoso-repository (repository)
+    ()
+    (:documentation "virtuoso sparql endpoint repository"))
 #+end_src
 
 We will use these classes throughout the code.  They will supply extra requirements on certain code sections.
@@ -137,6 +145,15 @@ We publish a set of different endpoints for the server endpoints.  The server is
   (defmethod server-upload-endpoint-postfix ((server fuseki-server))
     "/upload")
   
+  (defmethod server-query-endpoint-postfix ((server virtuoso-server))
+    "/sparql")
+  (defmethod server-update-endpoint-postfix ((server virtuoso-server))
+    "/sparql")
+  (defmethod server-data-endpoint-postfix ((server virtuoso-server))
+    "/sparql")
+  (defmethod server-upload-endpoint-postfix ((server virtuoso-server))
+    "/sparql")
+  
   (defmethod query-endpoint ((repos fuseki-repository))
     (let ((server (server repos)))
       (s+ (base-url server) (name repos) (server-query-endpoint-postfix server))))
@@ -149,6 +166,19 @@ We publish a set of different endpoints for the server endpoints.  The server is
   (defmethod upload-endpoint ((repos fuseki-repository))
     (let ((server (server repos)))
       (s+ (base-url server) (name repos) (server-upload-endpoint-postfix server))))
+  
+  (defmethod query-endpoint ((repos repository))
+    (let ((server (server repos)))
+      (s+ (base-url server) (server-query-endpoint-postfix server))))
+  (defmethod update-endpoint ((repos repository))
+    (let ((server (server repos)))
+      (s+ (base-url server) (server-update-endpoint-postfix server))))
+  (defmethod data-endpoint ((repos repository))
+    (let ((server (server repos)))
+      (s+ (base-url server) (server-data-endpoint-postfix server))))
+  (defmethod upload-endpoint ((repos repository))
+    (let ((server (server repos)))
+      (s+ (base-url server) (server-upload-endpoint-postfix server))))
 #+end_src
 
 * Query language
@@ -165,7 +195,7 @@ We support two query functions.  The first one is a generic query function which
   (defgeneric query (repository query &key &allow-other-keys)
     (:documentation "sends a sparql query to the repository and returns a jsown-parsed object of results.  calls query-raw for the raw processing."))
   
-  (defmethod query-raw ((repos fuseki-repository) (query string) &rest options &key &allow-other-keys)
+  (defmethod query-raw ((repos repository) (query string) &rest options &key &allow-other-keys)
     (flush-updates repos)
     (send-request (query-endpoint repos)
                   :accept (get-data-type-binding :json)
@@ -195,14 +225,14 @@ The query language sported two query functions, providing different ways of rece
   (defgeneric update-now (repository query)
     (:documentation "sends a sparql update query to the repository without waiting for anything"))
   
-  (defmethod update-now ((repos fuseki-repository) (update string))
+  (defmethod update-now ((repos repository) (update string))
     (send-request (update-endpoint repos)
                            :wanted-status-codes '(200 204) ; only 204 is in the spec
                            :content-type "application/sparql-update" ; fuseki-specific
                            :method :post
                            :content update))
   
-  (defmethod update ((repos fuseki-repository) (update string) &rest options &key &allow-other-keys)
+  (defmethod update ((repos repository) (update string) &rest options &key &allow-other-keys)
     (apply #'maybe-postpone-update 
            repos
            update

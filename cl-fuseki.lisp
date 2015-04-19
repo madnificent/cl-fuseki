@@ -5,19 +5,15 @@
   "Concatenates a set of strings"
   (apply #'concatenate 'string "" strings))
 
-
 (defvar *standard-prefixes* nil
   "contains all the standard prefixes, as prefix objects")
-
 (defstruct prefix
   (prefix)
   (iri))
-
 (defun is-standard-prefix-p (prefix)
   "Checks whether or not the prefixed string is contained in the current list of standard prefixes.
    Returns non-nil if the prefix string is a known standard prefix."
   (find prefix *standard-prefixes* :key #'prefix-prefix :test #'string=))
-
 (defun add-prefix (prefix iri)
   "Adds a prefix to the set of standard prefixes.  The prefix is the short version, the IRI is the long version.
    eg: (add-prefix \"rdf\" \"http://www.w3.org/1999/02/22-rdf-syntax-ns#\")"
@@ -32,7 +28,6 @@
     (setf *standard-prefixes*
           (remove-if (lambda (prefix-prefix) (string= prefix prefix-prefix))
                      *standard-prefixes* :key #'prefix-prefix))))
-
 (defun query-update-prefixes (query &key (prefix T prefix-p) &allow-other-keys)
   "Updates the query unless the :prefix keyword has been set to nil."
   (if (or prefix (not prefix-p))
@@ -43,13 +38,9 @@
           query)
       query))
 
-
 ; add standard prefixes
 (add-prefix "rdf" "http://www.w3.org/1999/02/22-rdf-syntax-ns#")
 (add-prefix "owl" "http://www.w3.org/2002/07/owl#")
-
-
-
 
 (defparameter *do-postponed-updates* T)
 
@@ -71,12 +62,9 @@
           (unless (remhash revoke
                            (slot-value repository
                                        'postponed-updates))
-            ;; TODO check semantics of this postponed update
-            ;;  wrt database correctness
-            ;; (update-now repository 
-            ;;             (query-update-prefixes update-string))
-            (push update-string (slot-value repository
-                                            'unnamed-postponed-updates))))))
+            (push update-string
+                  (slot-value repository
+                              'unnamed-postponed-updates))))))
 
 (defun flush-updates (repository)
   "performs all postponed updates which still need to be executed"
@@ -84,17 +72,17 @@
          (update-list (slot-value repository 'unnamed-postponed-updates))
          (keys (loop for key being the hash-keys of hash
                   collect key)))
-    (update-now repository
-                (query-update-prefixes 
-                 (s+ (apply #'s+ (loop for item in update-list
-                                    append (list item (format nil " ~%"))))
-                     (apply #'s+ (loop for key in keys
-                                    append (list (gethash key hash)
-                                                 (format nil " ~%")))))))
+    (when (> (hash-table-count hash) 0)
+      (update-now repository
+                  (query-update-prefixes 
+                   (s+ (apply #'s+ (loop for item in update-list
+                                      append (list item (format nil " ~%"))))
+                       (apply #'s+ (loop for key in keys
+                                      append (list (gethash key hash)
+                                                   (format nil " ~%"))))))))
     (setf (slot-value repository 'unnamed-postponed-updates) nil)
     (dolist (key keys)
       (remhash key hash))))
-
 
 (defun parse-ntriples-string (string)
   "converts an ntriples string into a list of triples (in which each triple is a list of three strings)"
@@ -154,7 +142,6 @@
              :response response))
     response))
 
-
 (defclass server ()
   ((base-url :accessor base-url
              :initarg :base-url
@@ -164,6 +151,10 @@
 (defclass fuseki-server (server)
   ()
   (:documentation "fuseki semantic web database server"))
+
+(defclass virtuoso-server (server)
+  ()
+  (:documentation "Virtuoso sparql endpoint"))
 
 (defclass repository ()
   ((name :accessor name
@@ -180,6 +171,9 @@
   ()
   (:documentation "fuseki sementic web database repository"))
 
+(defclass virtuoso-repository (repository)
+  ()
+  (:documentation "virtuoso sparql endpoint repository"))
 
 (defgeneric query-endpoint (repository)
   (:documentation "SPARQL query endpoint"))
@@ -208,6 +202,15 @@
 (defmethod server-upload-endpoint-postfix ((server fuseki-server))
   "/upload")
 
+(defmethod server-query-endpoint-postfix ((server virtuoso-server))
+  "/sparql")
+(defmethod server-update-endpoint-postfix ((server virtuoso-server))
+  "/sparql")
+(defmethod server-data-endpoint-postfix ((server virtuoso-server))
+  "/sparql")
+(defmethod server-upload-endpoint-postfix ((server virtuoso-server))
+  "/sparql")
+
 (defmethod query-endpoint ((repos fuseki-repository))
   (let ((server (server repos)))
     (s+ (base-url server) (name repos) (server-query-endpoint-postfix server))))
@@ -221,6 +224,18 @@
   (let ((server (server repos)))
     (s+ (base-url server) (name repos) (server-upload-endpoint-postfix server))))
 
+(defmethod query-endpoint ((repos repository))
+  (let ((server (server repos)))
+    (s+ (base-url server) (server-query-endpoint-postfix server))))
+(defmethod update-endpoint ((repos repository))
+  (let ((server (server repos)))
+    (s+ (base-url server) (server-update-endpoint-postfix server))))
+(defmethod data-endpoint ((repos repository))
+  (let ((server (server repos)))
+    (s+ (base-url server) (server-data-endpoint-postfix server))))
+(defmethod upload-endpoint ((repos repository))
+  (let ((server (server repos)))
+    (s+ (base-url server) (server-upload-endpoint-postfix server))))
 
 (defgeneric query-raw (repository query &key &allow-other-keys)
   (:documentation "sends a raw sparql query to the repository.  this is meant to connect to the SPARQL query endpoint.  this version doesn't parse the result.
@@ -229,7 +244,7 @@
 (defgeneric query (repository query &key &allow-other-keys)
   (:documentation "sends a sparql query to the repository and returns a jsown-parsed object of results.  calls query-raw for the raw processing."))
 
-(defmethod query-raw ((repos fuseki-repository) (query string) &rest options &key &allow-other-keys)
+(defmethod query-raw ((repos repository) (query string) &rest options &key &allow-other-keys)
   (flush-updates repos)
   (send-request (query-endpoint repos)
                 :accept (get-data-type-binding :json)
@@ -245,20 +260,19 @@
           (s+ ,@(loop for query in query-forms
                    append (list query " ")))
           ,@options))
-
 (defgeneric update (repository query &key &allow-other-keys)
   (:documentation "sends a sparql update to the repository."))
 (defgeneric update-now (repository query)
   (:documentation "sends a sparql update query to the repository without waiting for anything"))
 
-(defmethod update-now ((repos fuseki-repository) (update string))
+(defmethod update-now ((repos repository) (update string))
   (send-request (update-endpoint repos)
                          :wanted-status-codes '(200 204) ; only 204 is in the spec
                          :content-type "application/sparql-update" ; fuseki-specific
                          :method :post
                          :content update))
 
-(defmethod update ((repos fuseki-repository) (update string) &rest options &key &allow-other-keys)
+(defmethod update ((repos repository) (update string) &rest options &key &allow-other-keys)
   (apply #'maybe-postpone-update 
          repos
          update
@@ -270,7 +284,6 @@
           (s+ ,@(loop for query in query-forms
                    append (list query " ")))
           ,@options))
-
 (defgeneric ask (repository query &key &allow-other-keys)
   (:documentation "sends a sparql ask query to the repository and returns T if the answer was positive or NIL if the ansewer was negative.  calls query-raw for the raw processing."))
 
@@ -278,7 +291,6 @@
   (val (parse 
         (apply #'query-raw repos query options))
        "boolean"))
-
 (defmacro insert (repository (&rest options)
                   &body format)
   `(update ,repository
