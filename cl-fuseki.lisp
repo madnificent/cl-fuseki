@@ -31,10 +31,9 @@
 (defun query-update-prefixes (query &key (prefix T prefix-p) &allow-other-keys)
   "Updates the query unless the :prefix keyword has been set to nil."
   (if (or prefix (not prefix-p))
-      (s+ (apply #'s+ 
-                 (loop for p in *standard-prefixes*
-                    collect (s+ "PREFIX " (prefix-prefix p) ": "
-                                "<" (prefix-iri p) "> ")))
+      (s+ (format nil "~{~&PREFIX ~A: <~A>~%~}"
+                  (loop for p in *standard-prefixes*
+                     append (list (prefix-prefix p) (prefix-iri p))))
           query)
       query))
 
@@ -72,14 +71,13 @@
          (update-list (slot-value repository 'unnamed-postponed-updates))
          (keys (loop for key being the hash-keys of hash
                   collect key)))
-    (when (> (hash-table-count hash) 0)
-      (update-now repository
-                  (query-update-prefixes 
-                   (s+ (apply #'s+ (loop for item in update-list
-                                      append (list item (format nil " ~%"))))
-                       (apply #'s+ (loop for key in keys
-                                      append (list (gethash key hash)
-                                                   (format nil " ~%"))))))))
+    (update-now repository
+                (query-update-prefixes 
+                 (s+ (apply #'s+ (loop for item in update-list
+                                    append (list item (format nil " ~%"))))
+                     (apply #'s+ (loop for key in keys
+                                    append (list (gethash key hash)
+                                                 (format nil " ~%")))))))
     (setf (slot-value repository 'unnamed-postponed-updates) nil)
     (dolist (key keys)
       (remhash key hash))))
