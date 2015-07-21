@@ -247,12 +247,12 @@
 
 (defmacro with-query-logging (stream &body body)
   "Executes the following code block with query-logging enabled."
-  `(let ((*log-queries-p* ,stream))
+  `(let ((*query-log-stream* ,stream))
      ,@body))
 
 (defmacro without-query-logging (&body body)
   "Executes the following code-block with query logging disabled."
-  `(let ((*log-queries-p* nil))
+  `(let ((*query-log-stream* nil))
      ,@body))
 
 (defgeneric query-raw (repository query &key &allow-other-keys)

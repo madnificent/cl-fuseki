@@ -357,12 +357,12 @@ Some use cases may benefit from logging the queries to be executed.  This makes 
   
   (defmacro with-query-logging (stream &body body)
     "Executes the following code block with query-logging enabled."
-    `(let ((*log-queries-p* ,stream))
+    `(let ((*query-log-stream* ,stream))
        ,@body))
   
   (defmacro without-query-logging (&body body)
     "Executes the following code-block with query logging disabled."
-    `(let ((*log-queries-p* nil))
+    `(let ((*query-log-stream* nil))
        ,@body))
 #+end_src
 
