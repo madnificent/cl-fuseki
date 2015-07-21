@@ -235,6 +235,26 @@
   (let ((server (server repos)))
     (s+ (base-url server) (server-upload-endpoint-postfix server))))
 
+(defparameter *query-log-stream* nil
+  "non-nil indicates that queries should be logged to the
+   supplied stream.")
+
+(defun maybe-log-query (query)
+  "Performs query-logging if *query-log-stream* is truethy."
+  (when *query-log-stream*
+    (princ query *query-log-stream*))
+  query)
+
+(defmacro with-query-logging (stream &body body)
+  "Executes the following code block with query-logging enabled."
+  `(let ((*log-queries-p* ,stream))
+     ,@body))
+
+(defmacro without-query-logging (&body body)
+  "Executes the following code-block with query logging disabled."
+  `(let ((*log-queries-p* nil))
+     ,@body))
+
 (defgeneric query-raw (repository query &key &allow-other-keys)
   (:documentation "sends a raw sparql query to the repository.  this is meant to connect to the SPARQL query endpoint.  this version doesn't parse the result.
   see query for a version which returns a jsown parsed object of results"))
@@ -244,9 +264,11 @@
 
 (defmethod query-raw ((repos repository) (query string) &rest options &key &allow-other-keys)
   (flush-updates repos)
-  (send-request (query-endpoint repos)
-                :accept (get-data-type-binding :json)
-                :parameters `(("query" . ,(apply #'query-update-prefixes query options)))))
+  (let ((full-query (apply #'query-update-prefixes query options)))
+    (maybe-log-query full-query)
+    (send-request (query-endpoint repos)
+                  :accept (get-data-type-binding :json)
+                  :parameters `(("query" . ,full-query)))))
 
 (defmethod query ((repos repository) (query string) &rest options &key &allow-other-keys)
   (filter (parse (apply #'query-raw repos query options))

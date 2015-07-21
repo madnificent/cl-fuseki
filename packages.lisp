@@ -9,7 +9,8 @@
            :update :long-update
            :ask
            :add-prefix :rm-prefix
-           :insert :delete))
+           :insert :delete
+           :*log-queries-p* :with-query-logging :without-query-logging))
 
 (defpackage :cl-fuseki-user
   (:nicknames :fuseki-user)
