@@ -242,7 +242,9 @@
 (defun maybe-log-query (query)
   "Performs query-logging if *query-log-stream* is truethy."
   (when *query-log-stream*
-    (princ query *query-log-stream*))
+    (format *query-log-stream*
+            "~&==Executing query==~%~A~%~%"
+            query))
   query)
 
 (defmacro with-query-logging (stream &body body)
