@@ -82,15 +82,17 @@
     (dolist (key keys)
       (remhash key hash))))
 
+;; drakma setup
+(push (cons nil "x-turtle") drakma:*text-content-types*)
+(push (cons nil "sparql-results+json") drakma:*text-content-types*)
+
+(setf drakma:*drakma-default-external-format* :UTF-8)
+
 (defun parse-ntriples-string (string)
   "converts an ntriples string into a list of triples (in which each triple is a list of three strings)"
   (mapcar (lambda (triple)
             (cl-ppcre:split "\\s+" triple))
           (cl-ppcre:split "\\s+\\.\\s+" string)))
-
-;; drakma setup
-(push (cons nil "x-turtle") drakma:*text-content-types*)
-(push (cons nil "sparql-results+json") drakma:*text-content-types*)
 
 ;; data types
 (defparameter *data-type-bindings* (make-hash-table :test 'eq))

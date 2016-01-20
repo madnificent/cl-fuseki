@@ -15,6 +15,8 @@ This file describes the a lisp-api for fuseki.
 
   <<postponed-updates>>
   
+  <<drakma-configuration>>
+
   <<send-receive-request>>
   
   <<base-classes>>
@@ -471,10 +473,6 @@ For communicating with the server itself, we use drakma.  The following code all
               (cl-ppcre:split "\\s+" triple))
             (cl-ppcre:split "\\s+\\.\\s+" string)))
   
-  ;; drakma setup
-  (push (cons nil "x-turtle") drakma:*text-content-types*)
-  (push (cons nil "sparql-results+json") drakma:*text-content-types*)
-  
   ;; data types
   (defparameter *data-type-bindings* (make-hash-table :test 'eq))
   
@@ -522,6 +520,18 @@ For communicating with the server itself, we use drakma.  The following code all
                :status-code status-code
                :response response))
       response))
+#+end_src
+
+We configure drakma so it assumes x-turtle and sparql-results+json are interpreted as text.  This ensures easy parsing of the response.  We alse ensuer that the requests and responses are assumed to be encoded in UTF8, rather than the default of latin1.  This increases compatibilty.
+
+
+#+name: drakma-configuration
+#+begin_src lisp
+  ;; drakma setup
+  (push (cons nil "x-turtle") drakma:*text-content-types*)
+  (push (cons nil "sparql-results+json") drakma:*text-content-types*)
+  
+  (setf drakma:*drakma-default-external-format* :UTF-8)
 #+end_src
 
 * Support functions
