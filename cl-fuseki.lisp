@@ -274,6 +274,16 @@
                   :accept (get-data-type-binding :json)
                   :parameters `(("query" . ,full-query)))))
 
+(defmethod query-raw ((repos virtuoso-repository) (query string) &rest options &key &allow-other-keys)
+  (flush-updates repos)
+  (let ((full-query (apply #'query-update-prefixes query options)))
+    (maybe-log-query full-query)
+    (break "querying virtuoso")
+    (send-request (query-endpoint repos)
+                  :method :post
+                  :accept (get-data-type-binding :json)
+                  :parameters `(("query" . ,full-query)))))
+
 (defmethod query ((repos repository) (query string) &rest options &key &allow-other-keys)
   (filter (parse (apply #'query-raw repos query options))
           "results" "bindings"))
