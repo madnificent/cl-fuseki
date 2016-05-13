@@ -279,7 +279,6 @@
   (flush-updates repos)
   (let ((full-query (apply #'query-update-prefixes query options)))
     (maybe-log-query full-query)
-    (break "querying virtuoso")
     (send-request (query-endpoint repos)
                   :method :post
                   :accept (get-data-type-binding :json)
