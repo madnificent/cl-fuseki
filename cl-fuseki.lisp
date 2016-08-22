@@ -17,10 +17,10 @@
 (defun add-prefix (prefix iri)
   "Adds a prefix to the set of standard prefixes.  The prefix is the short version, the IRI is the long version.
    eg: (add-prefix \"rdf\" \"http://www.w3.org/1999/02/22-rdf-syntax-ns#\")"
-	(when (is-standard-prefix-p prefix)
-		(rm-prefix prefix))
-	(push (make-prefix :prefix prefix :iri iri)
-				*standard-prefixes*))
+  (when (is-standard-prefix-p prefix)
+    (rm-prefix prefix))
+  (push (make-prefix :prefix prefix :iri iri)
+        *standard-prefixes*))
 
 (defun rm-prefix (prefix)
   "Removes a prefix from the set of standard prefixes.  The prefix is the short version.
@@ -75,8 +75,9 @@
     (when (or update-list keys)
       (update-now repository
                   (query-update-prefixes 
-                   (format nil "~{~A~^; ~%~} ~{~A~^; ~%~}"
+                   (format nil "~{~A~^; ~%~} ~[~;;] ~{~A~^; ~%~}"
                            update-list
+                           (or update-list keys)
                            (loop for key in keys collect (gethash key hash)))))
       (setf (slot-value repository 'unnamed-postponed-updates) nil)
       (dolist (key keys)
@@ -274,6 +275,15 @@
                   :accept (get-data-type-binding :json)
                   :parameters `(("query" . ,full-query)))))
 
+(defmethod query-raw ((repos virtuoso-repository) (query string) &rest options &key &allow-other-keys)
+  (flush-updates repos)
+  (let ((full-query (apply #'query-update-prefixes query options)))
+    (maybe-log-query full-query)
+    (send-request (query-endpoint repos)
+                  :method :post
+                  :accept (get-data-type-binding :json)
+                  :parameters `(("query" . ,full-query)))))
+
 (defmethod query ((repos repository) (query string) &rest options &key &allow-other-keys)
   (filter (parse (apply #'query-raw repos query options))
           "results" "bindings"))
@@ -292,10 +302,10 @@
 (defmethod update-now ((repos repository) (update string))
   (maybe-log-query update)
   (send-request (update-endpoint repos)
-                         :wanted-status-codes '(200 204) ; only 204 is in the spec
-                         :content-type "application/sparql-update" ; fuseki-specific
-                         :method :post
-                         :content update))
+                :wanted-status-codes '(200 204) ; only 204 is in the spec
+                :content-type "application/sparql-update" ; fuseki-specific
+                :method :post
+                :content update))
 
 (defmethod update ((repos repository) (update string) &rest options &key &allow-other-keys)
   (apply #'maybe-postpone-update 

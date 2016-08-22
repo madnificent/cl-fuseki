@@ -4,3 +4,8 @@
 *fsl
 *o
 *.abcl
+*.bbl
+*.blg
+*.html
+*.pdf
+*.tex
