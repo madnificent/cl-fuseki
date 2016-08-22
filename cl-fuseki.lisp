@@ -75,7 +75,7 @@
     (when (or update-list keys)
       (update-now repository
                   (query-update-prefixes 
-                   (format nil "~{~A~^; ~%~} ~[~;;] ~{~A~^; ~%~}"
+                   (format nil "~{~A~^; ~%~} ~[~;;~] ~{~A~^; ~%~}"
                            update-list
                            (or update-list keys)
                            (loop for key in keys collect (gethash key hash)))))
