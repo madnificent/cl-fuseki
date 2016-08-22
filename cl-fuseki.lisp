@@ -289,6 +289,7 @@
   (:documentation "sends a sparql update query to the repository without waiting for anything"))
 
 (defmethod update-now ((repos repository) (update string))
+  (maybe-log-query update)
   (send-request (update-endpoint repos)
                          :wanted-status-codes '(200 204) ; only 204 is in the spec
                          :content-type "application/sparql-update" ; fuseki-specific
