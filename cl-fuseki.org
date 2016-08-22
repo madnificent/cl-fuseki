@@ -323,23 +323,23 @@ In some cases we may want to send updates only if a query occurs later on.  This
               (push update-string
                     (slot-value repository
                                 'unnamed-postponed-updates))))))
-  
+
   (defun flush-updates (repository)
     "performs all postponed updates which still need to be executed"
     (let* ((hash (slot-value repository 'postponed-updates))
            (update-list (slot-value repository 'unnamed-postponed-updates))
            (keys (loop for key being the hash-keys of hash
                     collect key)))
-      (update-now repository
-                  (query-update-prefixes 
-                   (s+ (apply #'s+ (loop for item in update-list
-                                      append (list item (format nil " ~%"))))
-                       (apply #'s+ (loop for key in keys
-                                      append (list (gethash key hash)
-                                                   (format nil " ~%")))))))
-      (setf (slot-value repository 'unnamed-postponed-updates) nil)
-      (dolist (key keys)
-        (remhash key hash))))
+      (when (or update-list keys)
+        (update-now repository
+                    (query-update-prefixes 
+                     (format nil "~{~A~^; ~%~} ~[~;;] ~{~A~^; ~%~}"
+                             update-list
+                             (or update-list keys)
+                             (loop for key in keys collect (gethash key hash)))))
+        (setf (slot-value repository 'unnamed-postponed-updates) nil)
+        (dolist (key keys)
+          (remhash key hash)))))
 #+end_src
 
 * Logging

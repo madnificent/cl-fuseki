@@ -71,16 +71,15 @@
          (update-list (slot-value repository 'unnamed-postponed-updates))
          (keys (loop for key being the hash-keys of hash
                   collect key)))
-    (update-now repository
-                (query-update-prefixes 
-                 (s+ (apply #'s+ (loop for item in update-list
-                                    append (list item (format nil " ~%"))))
-                     (apply #'s+ (loop for key in keys
-                                    append (list (gethash key hash)
-                                                 (format nil " ~%")))))))
-    (setf (slot-value repository 'unnamed-postponed-updates) nil)
-    (dolist (key keys)
-      (remhash key hash))))
+    (when (or update-list keys)
+      (update-now repository
+                  (query-update-prefixes 
+                   (format nil "~{~A~^; ~%~} ~{~A~^; ~%~}"
+                           update-list
+                           (loop for key in keys collect (gethash key hash)))))
+      (setf (slot-value repository 'unnamed-postponed-updates) nil)
+      (dolist (key keys)
+        (remhash key hash)))))
 
 ;; drakma setup
 (push (cons nil "x-turtle") drakma:*text-content-types*)
