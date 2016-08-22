@@ -17,9 +17,10 @@
 (defun add-prefix (prefix iri)
   "Adds a prefix to the set of standard prefixes.  The prefix is the short version, the IRI is the long version.
    eg: (add-prefix \"rdf\" \"http://www.w3.org/1999/02/22-rdf-syntax-ns#\")"
-  (unless (is-standard-prefix-p prefix)
-    (push (make-prefix :prefix prefix :iri iri)
-          *standard-prefixes*)))
+	(when (is-standard-prefix-p prefix)
+		(rm-prefix prefix))
+	(push (make-prefix :prefix prefix :iri iri)
+				*standard-prefixes*))
 
 (defun rm-prefix (prefix)
   "Removes a prefix from the set of standard prefixes.  The prefix is the short version.
