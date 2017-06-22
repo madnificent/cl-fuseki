@@ -63,7 +63,7 @@ The package is exported to a separate file.  You should be able to #'use-package
              :query :long-query
              :update :long-update
              :ask
-             :add-prefix :rm-prefix
+             :add-prefix :rm-prefix :get-prefix-alist :get-prefix
              :insert :delete
              :*log-queries-p* :with-query-logging :without-query-logging))
   
@@ -404,9 +404,10 @@ Prefixes occur more often than not.  In order to minimize the amount of typing t
 #+end_src
 
 *** Public interface
-We create two user-end functions, one to create the prefix and one to remove the prefix.  The interface is deliberately kept as simple as possible.
+We create two user-end manipulation functions, and two introspection functions.  Lastly, we offer some standard prefixes.  The interface is deliberately kept as simple as possible.
 
-#+name: prefix-support-public
+The manipulation of prefixes happens through add-prefix and rm-prefix.
+#+name: prefix-support-public-manipulation
 #+begin_src lisp
   (defun add-prefix (prefix iri)
     "Adds a prefix to the set of standard prefixes.  The prefix is the short version, the IRI is the long version.
@@ -414,7 +415,7 @@ We create two user-end functions, one to create the prefix and one to remove the
     (when (is-standard-prefix-p prefix)
       (rm-prefix prefix))
     (push (make-prefix :prefix prefix :iri iri)
-          *standard-prefixes*))
+          ,*standard-prefixes*))
 
   (defun rm-prefix (prefix)
     "Removes a prefix from the set of standard prefixes.  The prefix is the short version.
@@ -422,7 +423,25 @@ We create two user-end functions, one to create the prefix and one to remove the
     (when (is-standard-prefix-p prefix)
       (setf *standard-prefixes*
             (remove-if (lambda (prefix-prefix) (string= prefix prefix-prefix))
-                       *standard-prefixes* :key #'prefix-prefix))))
+                       ,*standard-prefixes* :key #'prefix-prefix))))
+
+#+end_src
+
+The introspection interface consists of retrieving all prefixes, or retrieving a specific prefix.  The alist seems to be the cleanest public interface.  Getting a specific prefix can be cumbersome, hence a helper function is offered.
+#+name: prefix-support-public-introspection
+#+begin_src lisp
+  (defun get-prefix-alist ()
+    "Returns an alist of prefixes."
+    (loop for prefix in *standard-prefixes*
+       collect (cons (prefix-prefix prefix)
+                     (prefix-iri prefix))))
+
+  (defun get-prefix (prefix)
+    "Returns the value associated to the supplied prefix."
+    (let ((cell (assoc prefix (get-prefix-alist) :test #'string=)))
+      (when (consp cell)
+        (cdr cell))))
+
 #+end_src
 
 There are some prefixes which occur all to often, we include them here by default.
