@@ -396,7 +396,8 @@ Prefixes occur more often than not.  In order to minimize the amount of typing t
 <<prefix-support-prefix-variable>>
 <<prefix-support-prefix-struct>>
 <<prefix-support-prefix-p>>
-<<prefix-support-public>>
+<<prefix-support-public-manipulation>>
+<<prefix-support-public-introspection>>
 <<prefix-support-implementation-public>>
 
 ; add standard prefixes

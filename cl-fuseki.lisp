@@ -14,6 +14,33 @@
   "Checks whether or not the prefixed string is contained in the current list of standard prefixes.
    Returns non-nil if the prefix string is a known standard prefix."
   (find prefix *standard-prefixes* :key #'prefix-prefix :test #'string=))
+(defun add-prefix (prefix iri)
+  "Adds a prefix to the set of standard prefixes.  The prefix is the short version, the IRI is the long version.
+   eg: (add-prefix \"rdf\" \"http://www.w3.org/1999/02/22-rdf-syntax-ns#\")"
+  (when (is-standard-prefix-p prefix)
+    (rm-prefix prefix))
+  (push (make-prefix :prefix prefix :iri iri)
+        *standard-prefixes*))
+
+(defun rm-prefix (prefix)
+  "Removes a prefix from the set of standard prefixes.  The prefix is the short version.
+   eg: (rm-prefix \"rdf\")"
+  (when (is-standard-prefix-p prefix)
+    (setf *standard-prefixes*
+          (remove-if (lambda (prefix-prefix) (string= prefix prefix-prefix))
+                     *standard-prefixes* :key #'prefix-prefix))))
+
+(defun get-prefix-alist ()
+  "Returns an alist of prefixes."
+  (loop for prefix in *standard-prefixes*
+     collect (cons (prefix-prefix prefix)
+                   (prefix-iri prefix))))
+
+(defun get-prefix (prefix)
+  "Returns the value associated to the supplied prefix."
+  (let ((cell (assoc prefix (get-prefix-alist) :test #'string=)))
+    (when (consp cell)
+      (cdr cell))))
 
 (defun query-update-prefixes (query &key (prefix T prefix-p) &allow-other-keys)
   "Updates the query unless the :prefix keyword has been set to nil."
