@@ -1,4 +1,3 @@
-
 (defpackage :cl-fuseki
   (:nicknames :fuseki)
   (:shadow :delete)
@@ -10,7 +9,8 @@
            :ask
            :add-prefix :rm-prefix :get-prefix-alist :get-prefix
            :insert :delete
-           :*log-queries-p* :with-query-logging :without-query-logging))
+           :*log-queries-p* :with-query-logging :without-query-logging
+           :sesame-exception))
 
 (defpackage :cl-fuseki-user
   (:nicknames :fuseki-user)
