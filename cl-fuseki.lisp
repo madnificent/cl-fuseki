@@ -109,7 +109,7 @@
           (cl-ppcre:split "\\s+\\.\\s+" string)))
 
 ;; data types
-(defparameter *data-type-bindings* (make-hash-table :test 'eq))
+(defparameter *data-type-bindings* (make-hash-table :test 'eq :synchronized t))
 
 (defun get-data-type-binding (symbol)
   (gethash symbol *data-type-bindings*))
@@ -177,7 +177,7 @@
    (server :accessor server
            :initarg :server
            :initform (error "server must be supplied"))
-   (postponed-updates :initform (make-hash-table :test 'equal))
+   (postponed-updates :initform (make-hash-table :test 'equal :synchronized t))
    (unnamed-postponed-updates :initform nil))
   (:documentation "generic semantic web database repository"))
 
